@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Clipboard History Management Tool",
+  "windows": ["copy-panel", "setting-panel"],
+  "urls": ["local"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-hide",
+    "core:window:allow-set-decorations",
+    "opener:default",
+    "macos-permissions:default",
+    "clipboard:read-all",
+    "clipboard:write-all",
+    "clipboard:monitor-all"
+  ]
+}
