@@ -12,16 +12,7 @@
   "app": {
     "macOSPrivateApi": true,
     "windows": [
-      {
-        "url": "index.html",
-        "label": "copy-panel",
-        "shadow": false,
-        "alwaysOnTop": true,
-        "transparent": true,
-        "decorations": false,
-        "acceptFirstMouse": true,
-        "skipTaskbar": true
-      }
+
     ],
     "security": {
       "csp": null
