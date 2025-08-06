@@ -181,6 +181,38 @@ pub fn open_panel_window(app_handle: AppHandle, panel_name: String) -> Result<()
     let _ = app_handle.set_dock_visibility(false);
 
     let main_panel = main_window.to_panel::<MyPanel>().unwrap();
+    
+    // 设置毛玻璃效果
+    unsafe {
+        use objc2::foundation::NSString;
+        use objc2::{msg_send, msg_send_id};
+        use objc2::runtime::NSObject;
+        
+        let ns_window = main_panel.as_panel().as_id();
+        let _: () = msg_send![ns_window, setTitlebarAppearsTransparent: true];
+        let _: () = msg_send![ns_window, setBackgroundColor: objc2::runtime::nil];
+        
+        // 设置毛玻璃效果 - NSVisualEffectView
+        let visual_effect_class = objc2::runtime::class!(NSVisualEffectView);
+        let visual_effect: *mut NSObject = msg_send![visual_effect_class, alloc];
+        let visual_effect: *mut NSObject = msg_send![visual_effect, init];
+        
+        // 设置毛玻璃材质 (NSVisualEffectMaterialMenu = 5)
+        let _: () = msg_send![visual_effect, setMaterial: 5i32];
+        // 设置混合模式 (NSVisualEffectBlendingModeBehindWindow = 0)
+        let _: () = msg_send![visual_effect, setBlendingMode: 0i32];
+        // 设置状态 (NSVisualEffectStateActive = 1)
+        let _: () = msg_send![visual_effect, setState: 1i32];
+        
+        // 获取窗口内容视图
+        let content_view: *mut NSObject = msg_send![ns_window, contentView];
+        let _: () = msg_send![content_view, addSubview: visual_effect];
+        let _: () = msg_send![visual_effect, setFrame: objc2::foundation::NSRect {
+            origin: objc2::foundation::NSPoint { x: 0.0, y: 0.0 },
+            size: objc2::foundation::NSSize { width: width, height: height }
+        }];
+        let _: () = msg_send![visual_effect, setAutoresizingMask: 18u32]; // NSViewWidthSizable | NSViewHeightSizable
+    }
 
     // 关键修改：使用 Status 或 PopUpMenu 层级，这些层级在 dock 之上
     let _ = main_panel.set_level(PanelLevel::ScreenSaver.into());

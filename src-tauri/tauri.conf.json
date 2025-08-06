@@ -11,8 +11,26 @@
   },
   "app": {
     "macOSPrivateApi": true,
+    "trayIcon": {
+      "iconPath": "icons/32x32.png",
+      "iconAsTemplate": true
+    },
     "windows": [
-
+      {
+        "label": "copy-panel",
+        "url": "index.html",
+        "width": 1200,
+        "height": 120,
+        "visible": false,
+        "alwaysOnTop": true,
+        "transparent": true,
+        "decorations": false,
+        "acceptFirstMouse": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "fullscreen": false,
+        "shadow": false
+      }
     ],
     "security": {
       "csp": null
