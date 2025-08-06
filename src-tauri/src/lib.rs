@@ -84,7 +84,18 @@ pub fn run() {
                             println!("Panel gained focus");
                         } else {
                             println!("Panel lost focus - hiding panel");
-                            let _ = window.hide();
+                            // 添加短暂延迟，避免快速焦点切换导致的误隐藏
+                            let window_clone = window.clone();
+                            tauri::async_runtime::spawn(async move {
+                                tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+                                // 再次检查窗口是否真的失去焦点
+                                if !window_clone.is_focused().unwrap_or(false) {
+                                    let _ = window_clone.hide();
+                                    println!("Panel actually hidden after delay check");
+                                } else {
+                                    println!("Panel regained focus, not hiding");
+                                }
+                            });
                         }
                     }
                 }

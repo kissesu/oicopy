@@ -5,7 +5,7 @@ use tauri_nspanel::{tauri_panel, WebviewWindowExt, CollectionBehavior, PanelLeve
 tauri_panel!(MyPanel {
     config: {
         canBecomeKeyWindow: true,
-        isFloatingPanel: false,
+        isFloatingPanel: true,
         nonactivatingPanel: false,
     }
 });
@@ -95,8 +95,11 @@ pub fn open_panel_window(app: AppHandle, panel_name: String) -> Result<(), Strin
                 println!("Opening panel at physical position: ({}, {})", physical_x, physical_y);
                 
                 if let Ok(panel) = win.to_panel::<MyPanel>() {
+                    // 多次尝试设置焦点
                     let _ = panel.show_and_make_key();
-                    println!("Panel shown and focused using show_and_make_key");
+                    let _ = win.set_focus();
+                    let _ = panel.show_and_make_key(); // 再次尝试
+                    println!("Panel shown and focused using multiple focus attempts");
                 } else {
                     let _ = win.show();
                     let _ = win.set_focus();
