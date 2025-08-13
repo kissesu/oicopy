@@ -11,10 +11,6 @@
   },
   "app": {
     "macOSPrivateApi": true,
-    "trayIcon": {
-      "iconPath": "icons/32x32.png",
-      "iconAsTemplate": true
-    },
     "windows": [
       {
         "label": "copy-panel",
@@ -30,6 +26,30 @@
         "resizable": false,
         "fullscreen": false,
         "shadow": false
+      },
+      {
+        "label": "settings",
+        "url": "index.html#/settings",
+        "width": 1090,
+        "height": 800,
+        "visible": false,
+        "center": true,
+        "resizable": false,
+        "decorations": true,
+        "title": "剪贴板设置",
+        "skipTaskbar": false
+      },
+      {
+        "label": "setting-panel",
+        "url": "index.html",
+        "width": 600,
+        "height": 600,
+        "visible": false,
+        "center": true,
+        "resizable": true,
+        "decorations": true,
+        "title": "权限设置",
+        "skipTaskbar": false
       }
     ],
     "security": {

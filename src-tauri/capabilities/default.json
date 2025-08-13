@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Clipboard History Management Tool",
-  "windows": ["copy-panel", "setting-panel"],
+  "windows": ["copy-panel", "setting-panel", "settings"],
   "urls": ["local"],
   "permissions": [
     "core:default",

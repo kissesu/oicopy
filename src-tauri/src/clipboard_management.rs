@@ -1,7 +1,9 @@
 use crate::db::{init_database, save_to_database, ClipboardHistoryItem};
 use chrono::Local;
 use rusqlite::params;
-use tauri::{AppHandle, Listener, Manager, Runtime};
+use tauri::{AppHandle, Listener, Manager, Runtime, Emitter};
+use sha2::{Sha256, Digest};
+use std::fmt::Write;
 
 // 开始监听剪切板
 fn start_clipboard_monitor<R: Runtime>(app_handle: AppHandle<R>) -> Result<(), String> {
@@ -39,8 +41,22 @@ fn fallback_strip_head_and_meta(html: &str) -> String {
         .to_string()
 }
 
+/// 计算内容的SHA256哈希值
+fn calculate_content_hash(content: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(content.as_bytes());
+    let result = hasher.finalize();
+    
+    // 转换为十六进制字符串
+    let mut hex_string = String::new();
+    for byte in result {
+        write!(&mut hex_string, "{:02x}", byte).unwrap();
+    }
+    hex_string
+}
+
 // 剪切板变化
-fn handle_clipboard_change(app_handle: &AppHandle) -> Result<(), String> {
+fn handle_clipboard_change(app_handle: &AppHandle) -> Result<bool, String> {
     let clipboard_state = app_handle.state::<tauri_plugin_clipboard::Clipboard>();
     let clipboard_type = clipboard_state.available_types()?;
 
@@ -49,6 +65,7 @@ fn handle_clipboard_change(app_handle: &AppHandle) -> Result<(), String> {
 
     // 获取当前时间作为时间戳
     let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    
 
     println!("clipboard_type: {:?}", clipboard_type);
     // 定义类型及其优先级顺序
@@ -61,6 +78,7 @@ fn handle_clipboard_change(app_handle: &AppHandle) -> Result<(), String> {
     ];
 
     let mut saved = false;
+    let mut actually_saved = false; // 新增：跟踪是否真的保存了新数据
 
     for (ty, enabled) in types {
         if enabled && !saved {
@@ -70,17 +88,28 @@ fn handle_clipboard_change(app_handle: &AppHandle) -> Result<(), String> {
                 "image" => {
                     if let Ok(image_base64) = clipboard_state.read_image_base64() {
                         if !image_base64.is_empty() {
+                            let content_hash = calculate_content_hash(&image_base64);
                             let preview = "图像内容".to_string();
                             let history_item = ClipboardHistoryItem {
                                 id: None,
                                 content_type: "image".to_string(),
                                 content: image_base64,
+                                content_hash: Some(content_hash),
                                 preview: Some(preview),
                                 timestamp: timestamp.clone(),
                             };
                             match save_to_database(&conn, &history_item) {
-                                Ok(id) => println!("图像已保存到数据库，ID: {}", id),
-                                Err(e) => eprintln!("保存图像失败: {}", e),
+                                Ok(id) => {
+                                    println!("图像已保存到数据库，ID: {}", id);
+                                    actually_saved = true;
+                                },
+                                Err(e) => {
+                                    if e == "内容重复" {
+                                        println!("图像内容重复，跳过保存");
+                                    } else {
+                                        eprintln!("保存图像失败: {}", e);
+                                    }
+                                },
                             }
                             saved = true;
                             break;
@@ -90,17 +119,28 @@ fn handle_clipboard_change(app_handle: &AppHandle) -> Result<(), String> {
                 "rtf" => {
                     if let Ok(rtf) = clipboard_state.read_rtf() {
                         if !rtf.is_empty() {
+                            let content_hash = calculate_content_hash(&rtf);
                             let preview = "RTF格式文本".to_string();
                             let history_item = ClipboardHistoryItem {
                                 id: None,
                                 content_type: "rtf".to_string(),
                                 content: rtf,
+                                content_hash: Some(content_hash),
                                 preview: Some(preview),
                                 timestamp: timestamp.clone(),
                             };
                             match save_to_database(&conn, &history_item) {
-                                Ok(id) => println!("RTF已保存到数据库，ID: {}", id),
-                                Err(e) => eprintln!("保存RTF失败: {}", e),
+                                Ok(id) => {
+                                    println!("RTF已保存到数据库，ID: {}", id);
+                                    actually_saved = true;
+                                },
+                                Err(e) => {
+                                    if e == "内容重复" {
+                                        println!("RTF内容重复，跳过保存");
+                                    } else {
+                                        eprintln!("保存RTF失败: {}", e);
+                                    }
+                                },
                             }
                             saved = true;
                             break;
@@ -112,6 +152,7 @@ fn handle_clipboard_change(app_handle: &AppHandle) -> Result<(), String> {
                         if !files.is_empty() {
                             let files_json =
                                 serde_json::to_string(&files).unwrap_or_else(|_| "[]".to_string());
+                            let content_hash = calculate_content_hash(&files_json);
                             let preview = if files.len() == 1 {
                                 format!("1个文件: {}", files[0])
                             } else {
@@ -121,12 +162,22 @@ fn handle_clipboard_change(app_handle: &AppHandle) -> Result<(), String> {
                                 id: None,
                                 content_type: "files".to_string(),
                                 content: files_json,
+                                content_hash: Some(content_hash),
                                 preview: Some(preview),
                                 timestamp: timestamp.clone(),
                             };
                             match save_to_database(&conn, &history_item) {
-                                Ok(id) => println!("文件列表已保存到数据库，ID: {}", id),
-                                Err(e) => eprintln!("保存文件列表失败: {}", e),
+                                Ok(id) => {
+                                    println!("文件列表已保存到数据库，ID: {}", id);
+                                    actually_saved = true;
+                                },
+                                Err(e) => {
+                                    if e == "内容重复" {
+                                        println!("文件列表内容重复，跳过保存");
+                                    } else {
+                                        eprintln!("保存文件列表失败: {}", e);
+                                    }
+                                },
                             }
                             saved = true;
                             break;
@@ -136,17 +187,28 @@ fn handle_clipboard_change(app_handle: &AppHandle) -> Result<(), String> {
                 "text" => {
                     if let Ok(text) = clipboard_state.read_text() {
                         if !text.is_empty() {
+                            let content_hash = calculate_content_hash(&text);
                             let preview = generate_preview(&text, 100);
                             let history_item = ClipboardHistoryItem {
                                 id: None,
                                 content_type: "text".to_string(),
                                 content: text,
+                                content_hash: Some(content_hash),
                                 preview: Some(preview),
                                 timestamp: timestamp.clone(),
                             };
                             match save_to_database(&conn, &history_item) {
-                                Ok(id) => println!("文本已保存到数据库，ID: {}", id),
-                                Err(e) => eprintln!("保存文本失败: {}", e),
+                                Ok(id) => {
+                                    println!("文本已保存到数据库，ID: {}", id);
+                                    actually_saved = true;
+                                },
+                                Err(e) => {
+                                    if e == "内容重复" {
+                                        println!("文本内容重复，跳过保存");
+                                    } else {
+                                        eprintln!("保存文本失败: {}", e);
+                                    }
+                                },
                             }
                             saved = true;
                             break;
@@ -156,17 +218,29 @@ fn handle_clipboard_change(app_handle: &AppHandle) -> Result<(), String> {
                 "html" => {
                     if let Ok(html) = clipboard_state.read_html() {
                         if !html.is_empty() {
+                            let cleaned_html = fallback_strip_head_and_meta(&html);
+                            let content_hash = calculate_content_hash(&cleaned_html);
                             let preview = "HTML内容".to_string();
                             let history_item = ClipboardHistoryItem {
                                 id: None,
                                 content_type: "html".to_string(),
-                                content: fallback_strip_head_and_meta(&html),
+                                content: cleaned_html,
+                                content_hash: Some(content_hash),
                                 preview: Some(preview),
                                 timestamp: timestamp.clone(),
                             };
                             match save_to_database(&conn, &history_item) {
-                                Ok(id) => println!("HTML已保存到数据库，ID: {}", id),
-                                Err(e) => eprintln!("保存HTML失败: {}", e),
+                                Ok(id) => {
+                                    println!("HTML已保存到数据库，ID: {}", id);
+                                    actually_saved = true;
+                                },
+                                Err(e) => {
+                                    if e == "内容重复" {
+                                        println!("HTML内容重复，跳过保存");
+                                    } else {
+                                        eprintln!("保存HTML失败: {}", e);
+                                    }
+                                },
                             }
                             saved = true;
                             break;
@@ -198,7 +272,7 @@ fn handle_clipboard_change(app_handle: &AppHandle) -> Result<(), String> {
         // 如果循环结束后没保存任何内容，做个降级处理
         println!("No clipboard data was saved");
     }
-    Ok(())
+    Ok(actually_saved)
 }
 
 pub fn setup_clipboard_monitor(app_handle: AppHandle) -> Result<(), String> {
@@ -209,8 +283,18 @@ pub fn setup_clipboard_monitor(app_handle: AppHandle) -> Result<(), String> {
     app_handle
         .clone()
         .listen("plugin:clipboard://clipboard-monitor/update", move |_| {
-            if let Err(e) = handle_clipboard_change(&app_handle) {
-                eprintln!("处理剪贴板变化出错: {}", e);
+            match handle_clipboard_change(&app_handle) {
+                Ok(saved) => {
+                    // 只有当内容真的被保存时才通知前端更新
+                    if saved {
+                        if let Err(e) = app_handle.emit("clipboard-updated", ()) {
+                            eprintln!("通知前端剪切板更新失败: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("处理剪贴板变化出错: {}", e);
+                }
             }
         });
 
@@ -232,9 +316,11 @@ fn generate_preview(content: &str, max_chars: usize) -> String {
 pub async fn get_clipboard_history(
     app: AppHandle,
     limit: Option<u32>,
+    offset: Option<u32>,
     content_type: Option<String>,
 ) -> Result<Vec<ClipboardHistoryItem>, String> {
     let limit = limit.unwrap_or(50);
+    let offset = offset.unwrap_or(0);
 
     // 获取数据库连接
     let conn = init_database(&app)?;
@@ -245,18 +331,19 @@ pub async fn get_clipboard_history(
             id: Some(row.get(0)?),
             content_type: row.get(1)?,
             content: row.get(2)?,
-            preview: row.get(3)?,
-            timestamp: row.get(4)?,
+            content_hash: row.get::<_, Option<String>>(3)?,
+            preview: row.get(4)?,
+            timestamp: row.get(5)?,
         })
     };
 
     // 根据是否提供了 content_type 选择不同的 SQL
     let sql = if content_type.is_some() {
-        "SELECT id, content_type, content, preview, timestamp FROM clipboard_history 
-         WHERE content_type = ?1 ORDER BY id DESC LIMIT ?2"
+        "SELECT id, content_type, content, content_hash, preview, timestamp FROM clipboard_history 
+         WHERE content_type = ?1 ORDER BY id DESC LIMIT ?2 OFFSET ?3"
     } else {
-        "SELECT id, content_type, content, preview, timestamp FROM clipboard_history 
-         ORDER BY id DESC LIMIT ?1"
+        "SELECT id, content_type, content, content_hash, preview, timestamp FROM clipboard_history 
+         ORDER BY id DESC LIMIT ?1 OFFSET ?2"
     };
 
     // 准备查询语句
@@ -266,9 +353,9 @@ pub async fn get_clipboard_history(
 
     // 执行查询，根据是否有 content_type 传递不同的参数
     let rows = if let Some(typ) = content_type.as_deref() {
-        stmt.query_map(params![typ, limit], map_row)
+        stmt.query_map(params![typ, limit, offset], map_row)
     } else {
-        stmt.query_map(params![limit], map_row)
+        stmt.query_map(params![limit, offset], map_row)
     }
     .map_err(|e| format!("查询失败: {}", e))?;
 

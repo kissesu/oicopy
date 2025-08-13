@@ -16,8 +16,6 @@ pub fn setup_panel_window(app: &AppHandle<Wry>) {
         .get_webview_window("copy-panel")
         .expect("copy-panel不存在！");
     
-    let _ = app.set_dock_visibility(false);
-    
     let panel = win.to_panel::<MyPanel>().unwrap();
 
     panel.set_level(PanelLevel::ScreenSaver.value());

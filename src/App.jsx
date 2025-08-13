@@ -5,6 +5,7 @@ import { HashRouter, Routes, Route } from "react-router-dom";
 import { PermissionContext } from "./context/permissionContext";
 import HomePage from "./components/HomePage";
 import PanelPage from "./components/PanelPage";
+import SettingsPage from "./components/SettingsPage";
 import { checkAccessibilityPermission, checkFullDiskAccessPermission } from "tauri-plugin-macos-permissions-api";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -36,8 +37,19 @@ class MyErrorBoundary extends React.Component {
 function AppContent() {
   const { isAccessible, isFullDiskAccessible, setIsAccessible, setIsFullDiskAccessible } = useContext(PermissionContext);
   const navigate = useNavigate();
+  
   useEffect(() => {
     async function checkAndNavigate() {
+      // 获取当前窗口标签
+      const currentWindow = await import('@tauri-apps/api/window').then(m => m.getCurrentWindow());
+      const windowLabel = currentWindow.label;
+      
+      // 如果是设置窗口，直接导航到设置页面，不进行权限检查
+      if (windowLabel === 'settings') {
+        navigate('/settings');
+        return;
+      }
+      
       // 调用外部定义的 checkPermissions（不要在这里再声明一遍！）
       const { isAccessible, isFullDiskAccessible } = await checkPermissions();
 
@@ -55,12 +67,14 @@ function AppContent() {
       }
     }
     checkAndNavigate();
-  }, [isAccessible, isFullDiskAccessible, navigate]);
+  }, [navigate]);
+  
   return (
     <main className="app-container !w-full h-full !pt-0">
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/panel" element={<PanelPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Routes>
     </main>
   )
