@@ -74,6 +74,9 @@ function SettingsPage() {
       const deletedCount = await invoke('clear_all_history_command');
       setSuccessMessage(`成功清理了 ${deletedCount} 条历史记录！`);
       setTimeout(() => setSuccessMessage(''), 3000);
+      
+      // 通知面板页面数据已清理
+      await invoke('emit_data_cleared_event');
     } catch (error) {
       console.error('清理所有历史记录失败:', error);
       setErrorMessage('清理失败，请稍后重试');

@@ -6,7 +6,7 @@ mod settings;
 
 use crate::clipboard_management::{get_clipboard_history, setup_clipboard_monitor};
 use crate::panel_window::{setup_panel_window, open_panel_window, hide_panel_window, toggle_panel_window};
-use crate::settings::{get_app_settings, save_app_settings, cleanup_old_history_command, clear_all_history_command, get_data_count};
+use crate::settings::{get_app_settings, save_app_settings, cleanup_old_history_command, clear_all_history_command, get_data_count, emit_data_cleared_event};
 use tauri::{Manager, AppHandle, Wry, WindowEvent};
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
 use tauri::menu::{Menu, MenuItem};
@@ -22,8 +22,27 @@ fn handle_tray_event(app: &AppHandle<Wry>, event: TrayIconEvent) {
             }
         }
         TrayIconEvent::DoubleClick { .. } => {
-            // 双击显示面板
-            let _ = open_panel_window(app.clone(), "copy-panel".to_string());
+            // 首先检查 setting-panel 是否正在显示
+            if let Some(setting_win) = app.get_webview_window("setting-panel") {
+                if setting_win.is_visible().unwrap_or(false) {
+                    println!("setting-panel is visible, focusing it instead of opening copy-panel");
+                    // 如果权限设置窗口已经显示，只是聚焦到它，不打开 copy-panel
+                    let _ = setting_win.set_focus();
+                    return;
+                }
+            }
+            
+            // 如果 setting-panel 没有显示，尝试显示 copy-panel
+            match open_panel_window(app.clone(), "copy-panel".to_string()) {
+                Ok(_) => println!("Copy panel opened from tray"),
+                Err(e) => {
+                    println!("Failed to open copy panel from tray: {}", e);
+                    // 如果权限不足，打开权限设置窗口
+                    if e.contains("权限不足") {
+                        let _ = open_panel_window(app.clone(), "setting-panel".to_string());
+                    }
+                }
+            }
         }
         _ => {}
     }
@@ -70,8 +89,31 @@ pub fn run() {
                         match event.state() {
                             ShortcutState::Pressed => {
                                 println!("Command+Shift+V Pressed!");
-                                // 只显示面板，不隐藏
-                                let _ = open_panel_window(app.app_handle().clone(), "copy-panel".to_string());
+                                
+                                // 首先检查 setting-panel 是否正在显示
+                                if let Some(setting_win) = app.app_handle().get_webview_window("setting-panel") {
+                                    if setting_win.is_visible().unwrap_or(false) {
+                                        println!("SHORTCUT BLOCKED: setting-panel is visible, user needs to complete permission setup first");
+                                        println!("Focusing setting-panel instead of opening copy-panel");
+                                        // 如果权限设置窗口已经显示，只是聚焦到它，绝对不打开 copy-panel
+                                        let _ = setting_win.set_focus();
+                                        return;
+                                    }
+                                }
+                                
+                                // 如果 setting-panel 没有显示，尝试显示 copy-panel
+                                println!("setting-panel not visible, attempting to open copy-panel");
+                                match open_panel_window(app.app_handle().clone(), "copy-panel".to_string()) {
+                                    Ok(_) => println!("Copy panel opened successfully via shortcut"),
+                                    Err(e) => {
+                                        println!("Failed to open copy panel via shortcut: {}", e);
+                                        // 如果权限不足，打开权限设置窗口
+                                        if e.contains("权限") {
+                                            println!("Opening setting-panel due to permission issues");
+                                            let _ = open_panel_window(app.app_handle().clone(), "setting-panel".to_string());
+                                        }
+                                    }
+                                }
                             }
                             ShortcutState::Released => {
                                 println!("Command+Shift+V Released!");
@@ -82,18 +124,19 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_macos_permissions::init())
-        .plugin(tauri_nspanel::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard::init())
+        .plugin(tauri_nspanel::init()) // 将 NSPanel 插件放在最后初始化
         .on_window_event(|window, event| {
-            // 处理窗口事件
+            // 处理窗口事件并记录所有窗口的状态
             match event {
                 WindowEvent::Focused(focused) => {
+                    println!("Window '{}' focus changed: {}", window.label(), focused);
                     if window.label() == "copy-panel" {
                         if *focused {
-                            println!("Panel gained focus");
+                            println!("NSPanel gained focus");
                         } else {
-                            println!("Panel lost focus - hiding panel");
+                            println!("NSPanel lost focus - hiding panel");
                             // 添加短暂延迟，避免快速焦点切换导致的误隐藏
                             let window_clone = window.clone();
                             tauri::async_runtime::spawn(async move {
@@ -101,12 +144,14 @@ pub fn run() {
                                 // 再次检查窗口是否真的失去焦点
                                 if !window_clone.is_focused().unwrap_or(false) {
                                     let _ = window_clone.hide();
-                                    println!("Panel actually hidden after delay check");
+                                    println!("NSPanel actually hidden after delay check");
                                 } else {
-                                    println!("Panel regained focus, not hiding");
+                                    println!("NSPanel regained focus, not hiding");
                                 }
                             });
                         }
+                    } else if window.label() == "setting-panel" && *focused {
+                        println!("setting-panel gained focus - this should be a regular window");
                     }
                 }
                 _ => {}
@@ -135,9 +180,23 @@ pub fn run() {
                 .build(app)
                 .expect("Failed to create tray icon");
             
-            // 只要在 macOS 下初始化即可
+            // 只在 macOS 下初始化 NSPanel，并且只对 copy-panel 窗口
             #[cfg(target_os = "macos")]
             {
+                println!("Initializing NSPanel setup for macOS");
+                
+                // 检查所有窗口并记录它们的状态
+                println!("Checking all windows:");
+                if let Some(_copy_win) = app.get_webview_window("copy-panel") {
+                    println!("- copy-panel window found - will convert to NSPanel");
+                }
+                if let Some(_setting_win) = app.get_webview_window("setting-panel") {
+                    println!("- setting-panel window found - will keep as regular window");
+                }
+                if let Some(_settings_win) = app.get_webview_window("settings") {
+                    println!("- settings window found - will keep as regular window");
+                }
+                
                 let _ = setup_panel_window(&app.app_handle());
             }
             let _ = setup_clipboard_monitor(app.app_handle().clone()).ok();
@@ -174,7 +233,8 @@ pub fn run() {
             save_app_settings,
             cleanup_old_history_command,
             clear_all_history_command,
-            get_data_count
+            get_data_count,
+            emit_data_cleared_event
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

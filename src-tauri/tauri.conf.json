@@ -42,14 +42,17 @@
       {
         "label": "setting-panel",
         "url": "index.html",
-        "width": 600,
-        "height": 600,
+        "width": 640,
+        "height": 210,
         "visible": false,
         "center": true,
-        "resizable": true,
-        "decorations": true,
+        "resizable": false,
+        "decorations": false,
         "title": "权限设置",
-        "skipTaskbar": false
+        "skipTaskbar": false,
+        "minimizable": false,
+        "maximizable": false,
+        "closable": false
       }
     ],
     "security": {

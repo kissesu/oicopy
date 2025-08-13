@@ -50,20 +50,33 @@ function AppContent() {
         return;
       }
       
-      // 调用外部定义的 checkPermissions（不要在这里再声明一遍！）
-      const { isAccessible, isFullDiskAccessible } = await checkPermissions();
+      // 如果是权限设置窗口，直接导航到首页（权限设置页面），不进行权限检查
+      if (windowLabel === 'setting-panel') {
+        navigate('/');
+        return;
+      }
+      
+      // 只有 copy-panel 窗口才进行权限检查和窗口管理
+      if (windowLabel === 'copy-panel') {
+        // 调用外部定义的 checkPermissions（不要在这里再声明一遍！）
+        const { isAccessible, isFullDiskAccessible } = await checkPermissions();
 
-      setIsAccessible(isAccessible);
-      setIsFullDiskAccessible(isFullDiskAccessible);
-      console.log("isAccessible: ", isAccessible, "isFullDiskAccessible: ", isFullDiskAccessible);
+        setIsAccessible(isAccessible);
+        setIsFullDiskAccessible(isFullDiskAccessible);
+        console.log("isAccessible: ", isAccessible, "isFullDiskAccessible: ", isFullDiskAccessible);
 
-      if (isAccessible && isFullDiskAccessible) {
-        // // 确认 getCurrentWindow() 返回的是 Promise
-        // await getCurrentWindow().setDecorations(false);
-        navigate("/panel");
-        invoke("open_panel_window", { panelName: "copy-panel" });
+        if (isAccessible && isFullDiskAccessible) {
+          // 权限足够，显示面板页面
+          navigate("/panel");
+        } else {
+          // 权限不足，隐藏当前窗口并打开权限设置窗口
+          const currentWindow = await import('@tauri-apps/api/window').then(m => m.getCurrentWindow());
+          await currentWindow.hide();
+          invoke("open_panel_window", { panelName: "setting-panel" });
+        }
       } else {
-        invoke("open_panel_window", { panelName: "setting-panel" });
+        // 其他窗口保持在默认路由（首页）
+        navigate('/');
       }
     }
     checkAndNavigate();
@@ -82,8 +95,8 @@ function AppContent() {
 
 function App() {
 
-  const [isAccessible, setIsAccessible] = useState(true);
-  const [isFullDiskAccessible, setIsFullDiskAccessible] = useState(true);
+  const [isAccessible, setIsAccessible] = useState(false);
+  const [isFullDiskAccessible, setIsFullDiskAccessible] = useState(false);
 
   return (
     <PermissionContext.Provider

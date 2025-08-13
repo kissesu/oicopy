@@ -72,12 +72,98 @@ export default function PanelPage() {
         await getClipboardHistory();
       });
       
+      // 监听数据清理事件
+      await listen("data-cleared", async () => {
+        console.log("数据已清理，重新获取历史记录");
+        await getClipboardHistory();
+      });
+      
       getClipboardHistory();
     }
     
     listenShortCut();
     
   }, [])
+
+  // 确保面板获得焦点
+  useEffect(() => {
+    const ensureFocus = async () => {
+      try {
+        const currentWindow = getCurrentWindow();
+        const windowLabel = currentWindow.label;
+        
+        if (windowLabel === 'copy-panel') {
+          console.log('PanelPage mounted, ensuring window and DOM focus');
+          
+          // 1. 设置窗口焦点
+          await currentWindow.setFocus();
+          
+          // 2. 强制设置DOM焦点
+          const container = document.querySelector('.panel-container');
+          if (container) {
+            container.focus();
+            console.log('DOM container focused');
+          }
+          
+          // 3. 延迟再次尝试，确保焦点设置成功
+          setTimeout(() => {
+            if (container) {
+              container.focus();
+              console.log('DOM container focused again after delay');
+            }
+          }, 100);
+          
+          // 检查焦点状态
+          const isFocused = await currentWindow.isFocused();
+          console.log('Window focus status:', isFocused);
+        }
+      } catch (error) {
+        console.error('Failed to ensure window focus:', error);
+      }
+    };
+
+    // 延迟执行，确保DOM已经渲染
+    setTimeout(ensureFocus, 50);
+  }, []);
+
+  // 监听窗口焦点变化
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('PanelPage gained focus');
+      // 当窗口获得焦点时，确保容器也获得焦点
+      const container = document.querySelector('.panel-container');
+      if (container) {
+        container.focus();
+        console.log('Container focused on window focus');
+      }
+    };
+
+    const handleBlur = () => {
+      console.log('PanelPage lost focus');
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
+
+  // 监听卡片数据变化，确保有数据时设置焦点
+  useEffect(() => {
+    if (cards.length > 0) {
+      console.log('Cards loaded, ensuring container focus');
+      setTimeout(() => {
+        const container = document.querySelector('.panel-container');
+        if (container) {
+          container.focus();
+          console.log('Container focused after cards loaded');
+        }
+      }, 100);
+    }
+  }, [cards]);
 
   // 滚动监听器
   const handleScroll = (e) => {
@@ -117,6 +203,100 @@ export default function PanelPage() {
       setLoading(false);
     }
   }
+
+  // 键盘导航处理
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (cards.length === 0) return;
+
+      const currentIndex = cards.findIndex(card => card.id === selectedId);
+      
+      switch (event.key) {
+        case 'ArrowLeft':
+          event.preventDefault();
+          // 不循环导航，到达边界时停止
+          if (currentIndex > 0) {
+            const newIndex = currentIndex - 1;
+            setSelectedId(cards[newIndex].id);
+            scrollToCardIfNeeded(newIndex);
+          }
+          break;
+          
+        case 'ArrowRight':
+          event.preventDefault();
+          // 不循环导航，到达边界时停止
+          if (currentIndex < cards.length - 1) {
+            const newIndex = currentIndex + 1;
+            setSelectedId(cards[newIndex].id);
+            scrollToCardIfNeeded(newIndex);
+          }
+          break;
+          
+        case 'Enter':
+          event.preventDefault();
+          const selectedCard = cards.find(card => card.id === selectedId);
+          if (selectedCard) {
+            clickCard(selectedCard);
+          }
+          break;
+          
+        case 'Escape':
+          event.preventDefault();
+          // 隐藏面板
+          invoke('hide_panel_window', { panelName: "copy-panel" });
+          break;
+      }
+    };
+
+    // 添加键盘事件监听
+    window.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [cards, selectedId]);
+
+  // 智能滚动：只在卡片不可见时才滚动
+  const scrollToCardIfNeeded = (cardIndex) => {
+    const container = document.querySelector('.no-scrollbar');
+    if (!container || cardIndex < 0 || cardIndex >= cards.length) return;
+
+    const cardWidth = 240 + 16; // 卡片宽度 + 间距 (space-x-4 = 16px)
+    const containerWidth = container.clientWidth;
+    const currentScrollLeft = container.scrollLeft;
+    
+    // 计算卡片的位置
+    const cardLeft = cardIndex * cardWidth;
+    const cardRight = cardLeft + 240; // 卡片宽度
+    
+    // 计算当前可见区域
+    const visibleLeft = currentScrollLeft;
+    const visibleRight = currentScrollLeft + containerWidth;
+    
+    // 判断卡片是否完全可见
+    const isCardVisible = cardLeft >= visibleLeft && cardRight <= visibleRight;
+    
+    if (!isCardVisible) {
+      let newScrollLeft;
+      
+      if (cardLeft < visibleLeft) {
+        // 卡片在左侧不可见，滚动到卡片左边缘
+        newScrollLeft = cardLeft;
+      } else {
+        // 卡片在右侧不可见，滚动使卡片右边缘可见
+        newScrollLeft = cardRight - containerWidth;
+      }
+      
+      // 确保滚动位置不超出边界
+      const maxScrollLeft = container.scrollWidth - containerWidth;
+      newScrollLeft = Math.max(0, Math.min(newScrollLeft, maxScrollLeft));
+      
+      container.scrollTo({
+        left: newScrollLeft,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   // 加载更多历史记录
   async function loadMoreHistory() {
@@ -161,6 +341,8 @@ export default function PanelPage() {
     setSelectedId(card ? id : null);
     
     try {
+      console.log('Copying card content and hiding panel');
+      
       switch (content_type) {
         case "text":
           await Clipboard.writeText(content);
@@ -198,8 +380,15 @@ export default function PanelPage() {
         default:
           console.warn("未知的剪切板类型:", content_type);
       }
+      
+      // 复制成功后立即隐藏面板
+      console.log('Content copied successfully, hiding panel');
+      await invoke('hide_panel_window', { panelName: "copy-panel" });
+      
     } catch (error) {
       console.error("复制到剪切板失败:", error);
+      // 即使复制失败也隐藏面板
+      await invoke('hide_panel_window', { panelName: "copy-panel" });
     }
   }
 
@@ -282,7 +471,18 @@ export default function PanelPage() {
   }
 
   return (
-    <div className="w-full h-full overflow-x-auto glass-strong">
+    <div 
+      className="panel-container w-full h-full overflow-x-auto glass-strong focus:outline-none" 
+      tabIndex={0}
+      autoFocus
+      onFocus={() => console.log('Container focused')}
+      onBlur={() => console.log('Container blurred')}
+      onClick={(e) => {
+        // 点击容器时确保获得焦点
+        e.currentTarget.focus();
+        console.log('Container clicked and focused');
+      }}
+    >
       {/* 检查是否有数据 */}
       {cards.length === 0 && !loading ? (
         <div className="h-full flex items-center justify-center">

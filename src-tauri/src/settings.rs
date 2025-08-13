@@ -59,3 +59,14 @@ pub async fn clear_all_history_command(app: AppHandle) -> Result<usize, String> 
     
     Ok(deleted_count as usize)
 }
+
+// 发送数据清理事件
+#[tauri::command]
+pub async fn emit_data_cleared_event(app: AppHandle) -> Result<(), String> {
+    use tauri::Emitter;
+    
+    app.emit("data-cleared", ())
+        .map_err(|e| format!("发送数据清理事件失败: {}", e))?;
+    
+    Ok(())
+}
