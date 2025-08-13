@@ -1,9 +1,29 @@
-use crate::db::{init_database, save_to_database, ClipboardHistoryItem};
+use crate::db::{init_database, save_to_database, ClipboardHistoryItem, cache_app_icon, get_cached_app_icon};
+use crate::app_info::{get_frontmost_app, get_app_icon};
 use chrono::Local;
 use rusqlite::params;
 use tauri::{AppHandle, Listener, Manager, Runtime, Emitter};
 use sha2::{Sha256, Digest};
 use std::fmt::Write;
+
+// 同步缓存应用图标
+fn cache_app_icon_if_needed(app_handle: &AppHandle, bundle_id: &str, app_name: Option<&str>) {
+    if bundle_id == "unknown.bundle.id" {
+        return;
+    }
+    
+    if let Ok(conn) = init_database(app_handle) {
+        // 检查是否已经缓存
+        if get_cached_app_icon(&conn, bundle_id).is_none() {
+            // 获取图标
+            let (_, icon_base64) = get_app_icon(bundle_id);
+            if let Some(icon_data) = icon_base64 {
+                let _ = cache_app_icon(&conn, bundle_id, app_name, &icon_data);
+                println!("已缓存应用图标: {}", bundle_id);
+            }
+        }
+    }
+}
 
 // 开始监听剪切板
 fn start_clipboard_monitor<R: Runtime>(app_handle: AppHandle<R>) -> Result<(), String> {
@@ -66,6 +86,17 @@ fn handle_clipboard_change(app_handle: &AppHandle) -> Result<bool, String> {
     // 获取当前时间作为时间戳
     let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     
+    // 获取当前前台应用信息
+    let (source_app, source_bundle_id) = match get_frontmost_app() {
+        Ok(app_info) => {
+            println!("剪切板内容来自应用: {} ({})", app_info.name, app_info.bundle_id);
+            (Some(app_info.name), Some(app_info.bundle_id))
+        },
+        Err(e) => {
+            println!("获取前台应用失败: {}", e);
+            (None, None)
+        }
+    };
 
     println!("clipboard_type: {:?}", clipboard_type);
     // 定义类型及其优先级顺序
@@ -97,11 +128,19 @@ fn handle_clipboard_change(app_handle: &AppHandle) -> Result<bool, String> {
                                 content_hash: Some(content_hash),
                                 preview: Some(preview),
                                 timestamp: timestamp.clone(),
+                                source_app: source_app.clone(),
+                                source_bundle_id: source_bundle_id.clone(),
+                                app_icon_base64: None,
                             };
                             match save_to_database(&conn, &history_item) {
                                 Ok(id) => {
                                     println!("图像已保存到数据库，ID: {}", id);
                                     actually_saved = true;
+                                    
+                                    // 缓存应用图标
+                                    if let Some(ref bundle_id) = source_bundle_id {
+                                        cache_app_icon_if_needed(&app_handle, bundle_id, source_app.as_deref());
+                                    }
                                 },
                                 Err(e) => {
                                     if e == "内容重复" {
@@ -128,6 +167,9 @@ fn handle_clipboard_change(app_handle: &AppHandle) -> Result<bool, String> {
                                 content_hash: Some(content_hash),
                                 preview: Some(preview),
                                 timestamp: timestamp.clone(),
+                                source_app: source_app.clone(),
+                                source_bundle_id: source_bundle_id.clone(),
+                                app_icon_base64: None,
                             };
                             match save_to_database(&conn, &history_item) {
                                 Ok(id) => {
@@ -165,6 +207,9 @@ fn handle_clipboard_change(app_handle: &AppHandle) -> Result<bool, String> {
                                 content_hash: Some(content_hash),
                                 preview: Some(preview),
                                 timestamp: timestamp.clone(),
+                                source_app: source_app.clone(),
+                                source_bundle_id: source_bundle_id.clone(),
+                                app_icon_base64: None,
                             };
                             match save_to_database(&conn, &history_item) {
                                 Ok(id) => {
@@ -196,6 +241,9 @@ fn handle_clipboard_change(app_handle: &AppHandle) -> Result<bool, String> {
                                 content_hash: Some(content_hash),
                                 preview: Some(preview),
                                 timestamp: timestamp.clone(),
+                                source_app: source_app.clone(),
+                                source_bundle_id: source_bundle_id.clone(),
+                                app_icon_base64: None,
                             };
                             match save_to_database(&conn, &history_item) {
                                 Ok(id) => {
@@ -228,6 +276,9 @@ fn handle_clipboard_change(app_handle: &AppHandle) -> Result<bool, String> {
                                 content_hash: Some(content_hash),
                                 preview: Some(preview),
                                 timestamp: timestamp.clone(),
+                                source_app: source_app.clone(),
+                                source_bundle_id: source_bundle_id.clone(),
+                                app_icon_base64: None,
                             };
                             match save_to_database(&conn, &history_item) {
                                 Ok(id) => {
@@ -325,6 +376,21 @@ pub async fn get_clipboard_history(
     // 获取数据库连接
     let conn = init_database(&app)?;
 
+    // 根据是否提供了 content_type 选择不同的 SQL，使用 LEFT JOIN 获取图标
+    let sql = if content_type.is_some() {
+        "SELECT h.id, h.content_type, h.content, h.content_hash, h.preview, h.timestamp, 
+                h.source_app, h.source_bundle_id, i.icon_base64
+         FROM clipboard_history h 
+         LEFT JOIN app_icons i ON h.source_bundle_id = i.bundle_id
+         WHERE h.content_type = ?1 ORDER BY h.id DESC LIMIT ?2 OFFSET ?3"
+    } else {
+        "SELECT h.id, h.content_type, h.content, h.content_hash, h.preview, h.timestamp, 
+                h.source_app, h.source_bundle_id, i.icon_base64
+         FROM clipboard_history h 
+         LEFT JOIN app_icons i ON h.source_bundle_id = i.bundle_id
+         ORDER BY h.id DESC LIMIT ?1 OFFSET ?2"
+    };
+
     // 定义统一的映射闭包
     let map_row = |row: &rusqlite::Row| -> rusqlite::Result<ClipboardHistoryItem> {
         Ok(ClipboardHistoryItem {
@@ -334,16 +400,10 @@ pub async fn get_clipboard_history(
             content_hash: row.get::<_, Option<String>>(3)?,
             preview: row.get(4)?,
             timestamp: row.get(5)?,
+            source_app: row.get::<_, Option<String>>(6)?,
+            source_bundle_id: row.get::<_, Option<String>>(7)?,
+            app_icon_base64: row.get::<_, Option<String>>(8)?,
         })
-    };
-
-    // 根据是否提供了 content_type 选择不同的 SQL
-    let sql = if content_type.is_some() {
-        "SELECT id, content_type, content, content_hash, preview, timestamp FROM clipboard_history 
-         WHERE content_type = ?1 ORDER BY id DESC LIMIT ?2 OFFSET ?3"
-    } else {
-        "SELECT id, content_type, content, content_hash, preview, timestamp FROM clipboard_history 
-         ORDER BY id DESC LIMIT ?1 OFFSET ?2"
     };
 
     // 准备查询语句

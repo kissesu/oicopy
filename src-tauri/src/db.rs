@@ -10,7 +10,10 @@ pub struct ClipboardHistoryItem {
     pub content: String,
     pub preview: Option<String>,
     pub timestamp: String,
-    pub content_hash: Option<String>, // 新增内容哈希字段
+    pub content_hash: Option<String>, // 内容哈希字段
+    pub source_app: Option<String>,   // 来源应用名称
+    pub source_bundle_id: Option<String>, // 来源应用Bundle ID
+    pub app_icon_base64: Option<String>, // 应用图标base64数据
 }
 
 // 定义设置结构体
@@ -43,15 +46,27 @@ pub fn init_database(app_handle: &AppHandle) -> Result<Connection, String> {
             content TEXT NOT NULL,
             content_hash TEXT,
             preview TEXT,
-            timestamp TEXT NOT NULL
+            timestamp TEXT NOT NULL,
+            source_app TEXT,
+            source_bundle_id TEXT
         )",
         [],
     )
     .map_err(|e| format!("创建剪贴板历史表失败: {}", e))?;
     
-    // 为旧表添加content_hash列（如果不存在）
+    // 为旧表添加新列（如果不存在）
     let _ = conn.execute(
         "ALTER TABLE clipboard_history ADD COLUMN content_hash TEXT",
+        [],
+    ); // 忽略错误，因为列可能已存在
+    
+    let _ = conn.execute(
+        "ALTER TABLE clipboard_history ADD COLUMN source_app TEXT",
+        [],
+    ); // 忽略错误，因为列可能已存在
+    
+    let _ = conn.execute(
+        "ALTER TABLE clipboard_history ADD COLUMN source_bundle_id TEXT",
         [],
     ); // 忽略错误，因为列可能已存在
     
@@ -60,6 +75,19 @@ pub fn init_database(app_handle: &AppHandle) -> Result<Connection, String> {
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_content_hash ON clipboard_history(content_hash)",
         [],
     );
+    
+    // 创建应用图标缓存表
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS app_icons (
+            bundle_id TEXT PRIMARY KEY,
+            app_name TEXT,
+            icon_base64 TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )",
+        [],
+    )
+    .map_err(|e| format!("创建应用图标缓存表失败: {}", e))?;
     
     // 创建设置表
     conn.execute(
@@ -84,14 +112,16 @@ pub fn init_database(app_handle: &AppHandle) -> Result<Connection, String> {
 // 保存剪贴板内容到数据库
 pub fn save_to_database(conn: &Connection, item: &ClipboardHistoryItem) -> Result<i64, String> {
     let result = conn.execute(
-        "INSERT INTO clipboard_history (content_type, content, content_hash, preview, timestamp) 
-         VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO clipboard_history (content_type, content, content_hash, preview, timestamp, source_app, source_bundle_id) 
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![
             item.content_type,
             item.content,
             item.content_hash,
             item.preview,
-            item.timestamp
+            item.timestamp,
+            item.source_app,
+            item.source_bundle_id
         ],
     );
 
@@ -150,4 +180,29 @@ pub fn cleanup_old_history(conn: &Connection, retention_days: i32) -> Result<usi
         .map_err(|e| format!("清理历史记录失败: {}", e))?;
     
     Ok(deleted_count)
+}
+
+// 从缓存中获取应用图标
+pub fn get_cached_app_icon(conn: &Connection, bundle_id: &str) -> Option<String> {
+    let mut stmt = conn
+        .prepare("SELECT icon_base64 FROM app_icons WHERE bundle_id = ?1")
+        .ok()?;
+    
+    stmt.query_row([bundle_id], |row| {
+        Ok(row.get::<_, String>(0)?)
+    }).ok()
+}
+
+// 缓存应用图标
+pub fn cache_app_icon(conn: &Connection, bundle_id: &str, app_name: Option<&str>, icon_base64: &str) -> Result<(), String> {
+    let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    
+    conn.execute(
+        "INSERT OR REPLACE INTO app_icons (bundle_id, app_name, icon_base64, created_at, updated_at) 
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![bundle_id, app_name, icon_base64, now, now],
+    )
+    .map_err(|e| format!("缓存应用图标失败: {}", e))?;
+    
+    Ok(())
 }

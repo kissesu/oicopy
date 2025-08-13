@@ -3,10 +3,12 @@ mod clipboard_management;
 mod db;
 mod panel_window;
 mod settings;
+mod app_info;
 
 use crate::clipboard_management::{get_clipboard_history, setup_clipboard_monitor};
 use crate::panel_window::{setup_panel_window, open_panel_window, hide_panel_window, toggle_panel_window};
 use crate::settings::{get_app_settings, save_app_settings, cleanup_old_history_command, clear_all_history_command, get_data_count, emit_data_cleared_event};
+use crate::app_info::{get_current_app_info, get_app_icon_by_bundle_id};
 use tauri::{Manager, AppHandle, Wry, WindowEvent};
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
 use tauri::menu::{Menu, MenuItem};
@@ -234,7 +236,9 @@ pub fn run() {
             cleanup_old_history_command,
             clear_all_history_command,
             get_data_count,
-            emit_data_cleared_event
+            emit_data_cleared_event,
+            get_current_app_info,
+            get_app_icon_by_bundle_id
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

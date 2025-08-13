@@ -15,6 +15,8 @@ import ImageIcon from "../assets/image_icon.svg";
 import RtfIcon from "../assets/rtf_icon.svg";
 import FilesIcon from "../assets/files_icon.svg";
 import FileIcon from "../assets/file_icon.svg";
+import { getAppIcon, getAppIconByName } from "../utils/appIcons";
+import AppIcon from "./AppIcon";
 
 dayjs.extend(relativeTime)
 dayjs.locale('zh-cn'); // 设置全局语言为中文
@@ -59,30 +61,30 @@ export default function PanelPage() {
   useEffect(() => {
     async function listenShortCut() {
       await listen("global_shortcut_copy_panel", async (evn) => {
-        alert("evn: ",evn);
-        console.log("evn: ",evn);
-        await invoke('open_panel_window', {panelName: "copy-panel"})
+        alert("evn: ", evn);
+        console.log("evn: ", evn);
+        await invoke('open_panel_window', { panelName: "copy-panel" })
         // 确认 getCurrentWindow() 返回的是 Promise
         // await getCurrentWindow().setDecorations(false);
       })
-      
+
       // 监听剪切板更新事件
       await listen("clipboard-updated", async () => {
         console.log("剪切板已更新，重新获取历史记录");
         await getClipboardHistory();
       });
-      
+
       // 监听数据清理事件
       await listen("data-cleared", async () => {
         console.log("数据已清理，重新获取历史记录");
         await getClipboardHistory();
       });
-      
+
       getClipboardHistory();
     }
-    
+
     listenShortCut();
-    
+
   }, [])
 
   // 确保面板获得焦点
@@ -91,20 +93,20 @@ export default function PanelPage() {
       try {
         const currentWindow = getCurrentWindow();
         const windowLabel = currentWindow.label;
-        
+
         if (windowLabel === 'copy-panel') {
           console.log('PanelPage mounted, ensuring window and DOM focus');
-          
+
           // 1. 设置窗口焦点
           await currentWindow.setFocus();
-          
+
           // 2. 强制设置DOM焦点
           const container = document.querySelector('.panel-container');
           if (container) {
             container.focus();
             console.log('DOM container focused');
           }
-          
+
           // 3. 延迟再次尝试，确保焦点设置成功
           setTimeout(() => {
             if (container) {
@@ -112,7 +114,7 @@ export default function PanelPage() {
               console.log('DOM container focused again after delay');
             }
           }, 100);
-          
+
           // 检查焦点状态
           const isFocused = await currentWindow.isFocused();
           console.log('Window focus status:', isFocused);
@@ -169,7 +171,7 @@ export default function PanelPage() {
   const handleScroll = (e) => {
     const { scrollLeft, scrollWidth, clientWidth } = e.target;
     const scrollPercentage = (scrollLeft + clientWidth) / scrollWidth;
-    
+
     // 当滚动到超过 80% 时，加载更多数据
     if (scrollPercentage > 0.8 && hasMore && !loading) {
       console.log('达到加载更多的阈值，开始加载...');
@@ -210,7 +212,7 @@ export default function PanelPage() {
       if (cards.length === 0) return;
 
       const currentIndex = cards.findIndex(card => card.id === selectedId);
-      
+
       switch (event.key) {
         case 'ArrowLeft':
           event.preventDefault();
@@ -221,7 +223,7 @@ export default function PanelPage() {
             scrollToCardIfNeeded(newIndex);
           }
           break;
-          
+
         case 'ArrowRight':
           event.preventDefault();
           // 不循环导航，到达边界时停止
@@ -231,7 +233,7 @@ export default function PanelPage() {
             scrollToCardIfNeeded(newIndex);
           }
           break;
-          
+
         case 'Enter':
           event.preventDefault();
           const selectedCard = cards.find(card => card.id === selectedId);
@@ -239,7 +241,7 @@ export default function PanelPage() {
             clickCard(selectedCard);
           }
           break;
-          
+
         case 'Escape':
           event.preventDefault();
           // 隐藏面板
@@ -250,7 +252,7 @@ export default function PanelPage() {
 
     // 添加键盘事件监听
     window.addEventListener('keydown', handleKeyDown);
-    
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
@@ -264,21 +266,21 @@ export default function PanelPage() {
     const cardWidth = 240 + 16; // 卡片宽度 + 间距 (space-x-4 = 16px)
     const containerWidth = container.clientWidth;
     const currentScrollLeft = container.scrollLeft;
-    
+
     // 计算卡片的位置
     const cardLeft = cardIndex * cardWidth;
     const cardRight = cardLeft + 240; // 卡片宽度
-    
+
     // 计算当前可见区域
     const visibleLeft = currentScrollLeft;
     const visibleRight = currentScrollLeft + containerWidth;
-    
+
     // 判断卡片是否完全可见
     const isCardVisible = cardLeft >= visibleLeft && cardRight <= visibleRight;
-    
+
     if (!isCardVisible) {
       let newScrollLeft;
-      
+
       if (cardLeft < visibleLeft) {
         // 卡片在左侧不可见，滚动到卡片左边缘
         newScrollLeft = cardLeft;
@@ -286,11 +288,11 @@ export default function PanelPage() {
         // 卡片在右侧不可见，滚动使卡片右边缘可见
         newScrollLeft = cardRight - containerWidth;
       }
-      
+
       // 确保滚动位置不超出边界
       const maxScrollLeft = container.scrollWidth - containerWidth;
       newScrollLeft = Math.max(0, Math.min(newScrollLeft, maxScrollLeft));
-      
+
       container.scrollTo({
         left: newScrollLeft,
         behavior: 'smooth'
@@ -301,29 +303,29 @@ export default function PanelPage() {
   // 加载更多历史记录
   async function loadMoreHistory() {
     if (loading || !hasMore) return;
-    
+
     setLoading(true);
     try {
       const result = await invoke("get_clipboard_history", {
         limit: 50, // 后续加载时一次加载50条
         offset: offset
       });
-      
+
       if (Array.isArray(result) && result.length > 0) {
         const newCards = result.filter((item, index, self) =>
           index === self.findIndex(t => t.id === item.id)
         );
-        
+
         // 去重合并
         const allCards = [...cards, ...newCards];
         const uniqueCards = allCards.filter((item, index, self) =>
           index === self.findIndex(t => t.id === item.id)
         );
-        
+
         setCards(uniqueCards);
         setOffset(prevOffset => prevOffset + 50);
         setHasMore(result.length === 50);
-        
+
         console.log(`加载了 ${newCards.length} 条新记录，共 ${uniqueCards.length} 条`);
       } else {
         setHasMore(false);
@@ -339,26 +341,26 @@ export default function PanelPage() {
   async function clickCard(card) {
     const { id, content_type, content } = card;
     setSelectedId(card ? id : null);
-    
+
     try {
       console.log('Copying card content and hiding panel');
-      
+
       switch (content_type) {
         case "text":
           await Clipboard.writeText(content);
           break;
-          
+
         case "html":
           // HTML内容需要同时写入HTML格式和纯文本格式
           const htmlText = content.replace(/<[^>]+>/g, ''); // 简单去除HTML标签作为纯文本
           await Clipboard.writeHtmlAndText(content, htmlText);
           break;
-          
+
         case "image":
           const base64 = card.content.trim();
           await Clipboard.writeImageBase64(base64);
           break;
-          
+
         case "files":
           try {
             let fileList;
@@ -376,15 +378,15 @@ export default function PanelPage() {
             console.error('处理文件列表失败:', fileError);
           }
           break;
-          
+
         default:
           console.warn("未知的剪切板类型:", content_type);
       }
-      
+
       // 复制成功后立即隐藏面板
       console.log('Content copied successfully, hiding panel');
       await invoke('hide_panel_window', { panelName: "copy-panel" });
-      
+
     } catch (error) {
       console.error("复制到剪切板失败:", error);
       // 即使复制失败也隐藏面板
@@ -409,11 +411,11 @@ export default function PanelPage() {
 
       case "image":
         return (
-          <div className="w-full h-full  flex flex-col">
+          <div className="w-full h-full flex flex-col items-center justify-center">
             <img
               src={`data:image/png;base64,${content}`}
               alt="clipboard"
-              className="max-w-full max-h-48 object-contain rounded"
+              className="max-w-full max-h-full object-contain rounded"
             />
           </div>
         );
@@ -438,11 +440,11 @@ export default function PanelPage() {
             console.warn('未知的文件内容格式:', typeof content, content);
             files = [String(content)];
           }
-          
+
           if (!Array.isArray(files)) {
             return <div className="text-red-500">文件数据格式错误</div>;
           }
-          
+
           console.log("files: ", files);
 
           return (
@@ -471,8 +473,8 @@ export default function PanelPage() {
   }
 
   return (
-    <div 
-      className="panel-container w-full h-full overflow-x-auto glass-strong focus:outline-none" 
+    <div
+      className="panel-container w-full h-full overflow-x-auto glass-strong focus:outline-none"
       tabIndex={0}
       autoFocus
       onFocus={() => console.log('Container focused')}
@@ -518,7 +520,7 @@ export default function PanelPage() {
               <div
                 key={card.id}
                 onClick={() => clickCard(card)}
-                className={`overflow-hidden w-[240px] flex-shrink-0 w-64 bg-white rounded-xl shadow-lg cursor-pointer transition-all duration-200
+                className={`overflow-hidden w-[240px] flex-shrink-0 bg-white rounded-xl shadow-lg cursor-pointer transition-all duration-200
                   border-4 ${isSelected ? 'border-blue-500 shadow-lg shadow-blue-500/30' : 'border-gray-200'}`}
               >
                 <div className="flex flex-col overflow-hide">
@@ -529,21 +531,53 @@ export default function PanelPage() {
                       </span>
                       <span className="text-[10px]">
                         {dayjs(card.timestamp).fromNow()}
-                        {card.timestamp}
                       </span>
+                      {/* {card.source_app && (
+                        <div className="flex items-center gap-1 text-[9px] opacity-80">
+                          <AppIcon 
+                            bundleId={card.source_bundle_id}
+                            appName={card.source_app}
+                            size={12}
+                            className="flex-shrink-0"
+                          />
+                          <span className="truncate">
+                            {card.source_app}
+                          </span>
+                        </div>
+                      )} */}
                     </div>
                     <div className="rounded-t-xl rounded-bl-xl w-[60px] h-[60px]">
-                      <img src={cardType[card.content_type].icon} alt="" width={60} height={60} style={{ position: "relative", left: "4px" }} />
+                      {card.app_icon_base64 ? (
+                        <img
+                          src={`data:image/png;base64,${card.app_icon_base64}`}
+                          alt={card.source_app || 'App Icon'}
+                          className="inline-block flex-shrink-0"
+                          style={{ width: 60, height: 60 }}
+                          onError={() => {
+                            // 如果图片加载失败，回退到 AppIcon 组件
+                            console.log('App icon failed to load, falling back to emoji');
+                          }}
+                        />
+                      ) : (
+                        <AppIcon
+                          bundleId={card.source_bundle_id}
+                          appName={card.source_app}
+                          size={60}
+                          className="flex-shrink-0"
+                        />
+                      )}
                     </div>
                   </div>
-                  <div className="h-full m-1">
-                    {renderCardContent(card)}
+                  <div className="h-[184px] m-1 overflow-hidden flex flex-col">
+                    <div className="flex-1 min-h-0">
+                      {renderCardContent(card)}
+                    </div>
                   </div>
                 </div>
               </div>
             );
           })}
-          
+
           {/* 加载更多指示器 */}
           {loading && (
             <div className="flex-shrink-0 w-64 h-40 flex items-center justify-center">
