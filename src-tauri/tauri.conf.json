@@ -40,8 +40,8 @@
         "skipTaskbar": false
       },
       {
-        "label": "setting-panel",
-        "url": "index.html",
+        "label": "check-permissions",
+        "url": "index.html#/check-permissions",
         "width": 640,
         "height": 210,
         "visible": false,

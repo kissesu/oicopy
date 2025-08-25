@@ -13,12 +13,12 @@ function HomePage() {
     async function checkWindowType() {
       const currentWindow = getCurrentWindow();
       const windowLabel = currentWindow.label;
-      const isSettingPanelWindow = windowLabel === 'setting-panel';
+      const isSettingPanelWindow = windowLabel === 'check-permissions';
       setIsSettingPanel(isSettingPanelWindow);
 
-      // 如果是 setting-panel 窗口，也检查一次权限状态
+      // 如果是 check-permissions 窗口，也检查一次权限状态
       if (isSettingPanelWindow) {
-        console.log('在 setting-panel 窗口中检查权限状态');
+        console.log('在 check-permissions 窗口中检查权限状态');
         await checkCurrentPermissions();
       }
     }
@@ -33,7 +33,7 @@ function HomePage() {
       const currentFullDiskAccessible = await checkFullDiskAccessPermission();
 
       console.log('实时权限检查结果:');
-      console.log('当前窗口类型: ', isSettingPanel ? 'setting-panel' : 'other');
+      console.log('当前窗口类型: ', isSettingPanel ? 'check-permissions' : 'other');
       console.log('辅助功能权限: ', currentAccessible);
       console.log('磁盘访问权限: ', currentFullDiskAccessible);
 
@@ -47,7 +47,7 @@ function HomePage() {
     }
   };
 
-  // 在 setting-panel 窗口中定时检查权限状态
+  // 在 check-permissions 窗口中定时检查权限状态
   useEffect(() => {
     if (isSettingPanel) {
       console.log('开始定时检查权限状态');
@@ -75,7 +75,7 @@ function HomePage() {
           console.log('当前权限状态 - 辅助功能:', isAccessible, '磁盘访问:', isFullDiskAccessible);
 
           // 先关闭设置面板
-          await invoke('hide_panel_window', { panelName: "setting-panel" });
+          await invoke('hide_panel_window', { panelName: "check-permissions" });
           console.log('设置面板已关闭');
 
           // 稍等一下确保设置面板完全关闭

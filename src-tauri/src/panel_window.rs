@@ -83,14 +83,14 @@ pub fn setup_panel_window(app: &AppHandle<Wry>) {
     }
     
     // 明确检查其他窗口，确保它们不被转换为 NSPanel
-    if let Some(setting_win) = app.get_webview_window("setting-panel") {
-        println!("setting-panel window found - label: '{}' - keeping as regular window", setting_win.label());
-        // 绝对不对 setting-panel 进行任何 NSPanel 转换
+    if let Some(check_permissions_win) = app.get_webview_window("check-permissions") {
+        println!("check-permissions window found - label: '{}' - keeping as regular window", check_permissions_win.label());
+        // 绝对不对 check-permissions 进行任何 NSPanel 转换
         // 如果意外被转换了，这里会记录错误
-        if let Ok(_) = setting_win.to_panel::<MyPanel>() {
-            println!("ERROR: setting-panel was unexpectedly converted to NSPanel!");
+        if let Ok(_) = check_permissions_win.to_panel::<MyPanel>() {
+            println!("ERROR: check-permissions was unexpectedly converted to NSPanel!");
         } else {
-            println!("Confirmed: setting-panel is a regular window (not NSPanel)");
+            println!("Confirmed: check-permissions is a regular window (not NSPanel)");
         }
     }
     
@@ -106,11 +106,11 @@ pub fn open_panel_window(app: AppHandle, panel_name: String) -> Result<(), Strin
         "copy-panel" => {
             if let Some(win) = app.get_webview_window("copy-panel") {
                 // 在显示 copy-panel 之前，严格检查权限状态
-                // 如果 setting-panel 窗口正在显示，说明权限不足，绝对不应该显示 copy-panel
-                if let Some(setting_win) = app.get_webview_window("setting-panel") {
-                    if setting_win.is_visible().unwrap_or(false) {
-                        println!("BLOCKED: setting-panel is visible, indicating insufficient permissions. Absolutely not showing copy-panel.");
-                        println!("User should complete permission setup in setting-panel first.");
+                // 如果 check-permissions 窗口正在显示，说明权限不足，绝对不应该显示 copy-panel
+                if let Some(check_permissions_win) = app.get_webview_window("check-permissions") {
+                    if check_permissions_win.is_visible().unwrap_or(false) {
+                        println!("BLOCKED: check-permissions is visible, indicating insufficient permissions. Absolutely not showing copy-panel.");
+                        println!("User should complete permission setup in check-permissions first.");
                         return Err("权限设置窗口正在显示，请先完成权限授权".into());
                     }
                 }
@@ -145,9 +145,9 @@ pub fn open_panel_window(app: AppHandle, panel_name: String) -> Result<(), Strin
                 }
                 
                 // 最后一次检查：确保没有其他权限相关的窗口在显示
-                if let Some(setting_win) = app.get_webview_window("setting-panel") {
-                    if setting_win.is_visible().unwrap_or(false) {
-                        println!("FINAL CHECK FAILED: setting-panel became visible, aborting copy-panel display");
+                if let Some(check_permissions_win) = app.get_webview_window("check-permissions") {
+                    if check_permissions_win.is_visible().unwrap_or(false) {
+                        println!("FINAL CHECK FAILED: check-permissions became visible, aborting copy-panel display");
                         return Err("权限设置窗口已显示，取消主面板显示".into());
                     }
                 }
@@ -196,18 +196,18 @@ pub fn open_panel_window(app: AppHandle, panel_name: String) -> Result<(), Strin
                 return Err("copy-panel不存在".into());
             }
         }
-        "setting-panel" => {
-            if let Some(win) = app.get_webview_window("setting-panel") {
+        "check-permissions" => {
+            if let Some(win) = app.get_webview_window("check-permissions") {
                 // 当显示权限设置窗口时，确保主面板被隐藏
                 if let Some(copy_win) = app.get_webview_window("copy-panel") {
                     if copy_win.is_visible().unwrap_or(false) {
-                        println!("Hiding copy-panel before showing setting-panel");
+                        println!("Hiding copy-panel before showing check-permissions");
                         let _ = copy_win.hide();
                     }
                 }
                 
                 // 权限设置窗口是普通窗口，绝对不进行 NSPanel 处理
-                println!("Opening setting-panel as regular window (NOT NSPanel)");
+                println!("Opening check-permissions as regular window (NOT NSPanel)");
                 
                 // 确保窗口不是 NSPanel
                 // 如果意外被转换了，这里会失败，但我们继续使用普通窗口方法
@@ -216,7 +216,7 @@ pub fn open_panel_window(app: AppHandle, panel_name: String) -> Result<(), Strin
                 
                 println!("Setting panel window shown as regular window");
             } else {
-                return Err("setting-panel不存在".into());
+                return Err("check-permissions不存在".into());
             }
         }
         "settings" => {
@@ -244,11 +244,11 @@ pub fn hide_panel_window(app: AppHandle, panel_name: String) -> Result<(), Strin
                 return Err("copy-panel不存在".into());
             }
         }
-        "setting-panel" => {
-            if let Some(win) = app.get_webview_window("setting-panel") {
+        "check-permissions" => {
+            if let Some(win) = app.get_webview_window("check-permissions") {
                 let _ = win.hide();
             } else {
-                return Err("setting-panel不存在".into());
+                return Err("check-permissions不存在".into());
             }
         }
         "settings" => {

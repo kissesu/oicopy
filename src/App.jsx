@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import "./App.css";
 import { HashRouter, Routes, Route } from "react-router-dom";
 import { PermissionContext } from "./context/permissionContext";
-import HomePage from "./components/HomePage";
+import HomePage from "./components/CheckPermissions";
 import PanelPage from "./components/PanelPage";
-import SettingsPage from "./components/SettingsPage";
+import SettingsPage from "./components/Settings";
 import { checkAccessibilityPermission, checkFullDiskAccessPermission } from "tauri-plugin-macos-permissions-api";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -51,7 +51,7 @@ function AppContent() {
       }
       
       // 如果是权限设置窗口，直接导航到首页（权限设置页面），不进行权限检查
-      if (windowLabel === 'setting-panel') {
+      if (windowLabel === 'check-permissions') {
         navigate('/');
         return;
       }
@@ -72,7 +72,7 @@ function AppContent() {
           // 权限不足，隐藏当前窗口并打开权限设置窗口
           const currentWindow = await import('@tauri-apps/api/window').then(m => m.getCurrentWindow());
           await currentWindow.hide();
-          invoke("open_panel_window", { panelName: "setting-panel" });
+          invoke("open_panel_window", { panelName: "check-permissions" });
         }
       } else {
         // 其他窗口保持在默认路由（首页）

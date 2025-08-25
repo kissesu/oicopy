@@ -24,24 +24,24 @@ fn handle_tray_event(app: &AppHandle<Wry>, event: TrayIconEvent) {
             }
         }
         TrayIconEvent::DoubleClick { .. } => {
-            // 首先检查 setting-panel 是否正在显示
-            if let Some(setting_win) = app.get_webview_window("setting-panel") {
+            // 首先检查 check-permissions 是否正在显示
+            if let Some(setting_win) = app.get_webview_window("check-permissions") {
                 if setting_win.is_visible().unwrap_or(false) {
-                    println!("setting-panel is visible, focusing it instead of opening copy-panel");
+                    println!("check-permissions is visible, focusing it instead of opening copy-panel");
                     // 如果权限设置窗口已经显示，只是聚焦到它，不打开 copy-panel
                     let _ = setting_win.set_focus();
                     return;
                 }
             }
             
-            // 如果 setting-panel 没有显示，尝试显示 copy-panel
+            // 如果 check-permissions 没有显示，尝试显示 copy-panel
             match open_panel_window(app.clone(), "copy-panel".to_string()) {
                 Ok(_) => println!("Copy panel opened from tray"),
                 Err(e) => {
                     println!("Failed to open copy panel from tray: {}", e);
                     // 如果权限不足，打开权限设置窗口
                     if e.contains("权限不足") {
-                        let _ = open_panel_window(app.clone(), "setting-panel".to_string());
+                        let _ = open_panel_window(app.clone(), "check-permissions".to_string());
                     }
                 }
             }
@@ -92,27 +92,27 @@ pub fn run() {
                             ShortcutState::Pressed => {
                                 println!("Command+Shift+V Pressed!");
                                 
-                                // 首先检查 setting-panel 是否正在显示
-                                if let Some(setting_win) = app.app_handle().get_webview_window("setting-panel") {
+                                // 首先检查 check-permissions 是否正在显示
+                                if let Some(setting_win) = app.app_handle().get_webview_window("check-permissions") {
                                     if setting_win.is_visible().unwrap_or(false) {
-                                        println!("SHORTCUT BLOCKED: setting-panel is visible, user needs to complete permission setup first");
-                                        println!("Focusing setting-panel instead of opening copy-panel");
+                                        println!("SHORTCUT BLOCKED: check-permissions is visible, user needs to complete permission setup first");
+                                        println!("Focusing check-permissions instead of opening copy-panel");
                                         // 如果权限设置窗口已经显示，只是聚焦到它，绝对不打开 copy-panel
                                         let _ = setting_win.set_focus();
                                         return;
                                     }
                                 }
                                 
-                                // 如果 setting-panel 没有显示，尝试显示 copy-panel
-                                println!("setting-panel not visible, attempting to open copy-panel");
+                                // 如果 check-permissions 没有显示，尝试显示 copy-panel
+                                println!("check-permissions not visible, attempting to open copy-panel");
                                 match open_panel_window(app.app_handle().clone(), "copy-panel".to_string()) {
                                     Ok(_) => println!("Copy panel opened successfully via shortcut"),
                                     Err(e) => {
                                         println!("Failed to open copy panel via shortcut: {}", e);
                                         // 如果权限不足，打开权限设置窗口
                                         if e.contains("权限") {
-                                            println!("Opening setting-panel due to permission issues");
-                                            let _ = open_panel_window(app.app_handle().clone(), "setting-panel".to_string());
+                                            println!("Opening check-permissions due to permission issues");
+                                            let _ = open_panel_window(app.app_handle().clone(), "check-permissions".to_string());
                                         }
                                     }
                                 }
@@ -152,8 +152,8 @@ pub fn run() {
                                 }
                             });
                         }
-                    } else if window.label() == "setting-panel" && *focused {
-                        println!("setting-panel gained focus - this should be a regular window");
+                    } else if window.label() == "check-permissions" && *focused {
+                        println!("check-permissions gained focus - this should be a regular window");
                     }
                 }
                 _ => {}
@@ -192,8 +192,8 @@ pub fn run() {
                 if let Some(_copy_win) = app.get_webview_window("copy-panel") {
                     println!("- copy-panel window found - will convert to NSPanel");
                 }
-                if let Some(_setting_win) = app.get_webview_window("setting-panel") {
-                    println!("- setting-panel window found - will keep as regular window");
+                if let Some(_setting_win) = app.get_webview_window("check-permissions") {
+                    println!("- check-permissions window found - will keep as regular window");
                 }
                 if let Some(_settings_win) = app.get_webview_window("settings") {
                     println!("- settings window found - will keep as regular window");
