@@ -1,0 +1,229 @@
+/* 数据库优化组件动画样式 */
+
+/* 防止页面抖动的基础样式 */
+.smooth-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.smooth-transform {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 按钮动画 - 使用 transform 而不是影响布局的属性 */
+.button-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0); /* 启用硬件加速 */
+  will-change: transform, opacity, background-color;
+}
+
+.button-smooth:hover {
+  transform: translateY(-1px) translateZ(0);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.button-smooth:active {
+  transform: translateY(0) translateZ(0);
+  transition-duration: 0.1s;
+}
+
+/* 移除会导致布局跳动的 scale 变换 */
+.button-no-scale {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0);
+}
+
+.button-no-scale:hover {
+  transform: translateY(-1px) translateZ(0);
+  background-color: rgba(255, 255, 255, 0.4);
+}
+
+.button-no-scale:active {
+  transform: translateY(0) translateZ(0);
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* 进度条动画优化 */
+.progress-bar {
+  transform-origin: left center;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+/* 卡片悬停效果 - 使用 transform 而不是 box-shadow */
+.card-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0);
+  will-change: transform, background-color;
+}
+
+.card-smooth:hover {
+  transform: translateY(-2px) translateZ(0);
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+/* 加载状态动画优化 */
+.loading-overlay {
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity;
+}
+
+/* 消息提示动画 */
+.message-slide {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0);
+  will-change: transform, opacity;
+}
+
+.message-slide.enter {
+  transform: translateY(-10px) translateZ(0);
+  opacity: 0;
+}
+
+.message-slide.enter-active {
+  transform: translateY(0) translateZ(0);
+  opacity: 1;
+}
+
+.message-slide.exit {
+  transform: translateY(-10px) translateZ(0);
+  opacity: 0;
+}
+
+/* 状态指示器动画 */
+.status-indicator {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0);
+  will-change: background-color, border-color;
+}
+
+/* 旋转动画优化 */
+.spin-smooth {
+  animation: spin-smooth 1s linear infinite;
+  will-change: transform;
+}
+
+@keyframes spin-smooth {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 脉冲动画优化 */
+.pulse-smooth {
+  animation: pulse-smooth 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  will-change: opacity;
+}
+
+@keyframes pulse-smooth {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* 防止文本选择导致的布局跳动 */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* 优化滚动条样式 */
+.smooth-scroll {
+  scroll-behavior: smooth;
+}
+
+.smooth-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.smooth-scroll::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+
+.smooth-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  transition: background-color 0.3s ease;
+}
+
+.smooth-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* 容器稳定性 */
+.stable-container {
+  contain: layout style paint;
+  will-change: auto;
+}
+
+/* 图标动画优化 */
+.icon-smooth {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.icon-smooth:hover {
+  transform: scale(1.1) translateZ(0);
+}
+
+/* 背景渐变动画优化 */
+.gradient-smooth {
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: background-color;
+}
+
+/* 边框动画优化 */
+.border-smooth {
+  transition: border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: border-color;
+}
+
+/* 阴影动画优化 */
+.shadow-smooth {
+  transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: box-shadow;
+}
+
+/* 透明度动画优化 */
+.opacity-smooth {
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity;
+}
+
+/* 组合动画类 */
+.interactive-element {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0);
+  will-change: transform, background-color, border-color, box-shadow;
+}
+
+.interactive-element:hover {
+  transform: translateY(-1px) translateZ(0);
+}
+
+.interactive-element:active {
+  transform: translateY(0) translateZ(0);
+  transition-duration: 0.1s;
+}
+
+/* 防止布局抖动的工具类 */
+.prevent-layout-shift {
+  contain: layout;
+  transform: translateZ(0);
+}
+
+/* 性能优化类 */
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}

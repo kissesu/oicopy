@@ -37,25 +37,25 @@ class MyErrorBoundary extends React.Component {
 function AppContent() {
   const { isAccessible, isFullDiskAccessible, setIsAccessible, setIsFullDiskAccessible } = useContext(PermissionContext);
   const navigate = useNavigate();
-  
+
   useEffect(() => {
     async function checkAndNavigate() {
       // 获取当前窗口标签
       const currentWindow = await import('@tauri-apps/api/window').then(m => m.getCurrentWindow());
       const windowLabel = currentWindow.label;
-      
+
       // 如果是设置窗口，直接导航到设置页面，不进行权限检查
       if (windowLabel === 'settings') {
         navigate('/settings');
         return;
       }
-      
+
       // 如果是权限设置窗口，直接导航到首页（权限设置页面），不进行权限检查
       if (windowLabel === 'check-permissions') {
         navigate('/');
         return;
       }
-      
+
       // 只有 copy-panel 窗口才进行权限检查和窗口管理
       if (windowLabel === 'copy-panel') {
         // 调用外部定义的 checkPermissions（不要在这里再声明一遍！）
@@ -81,7 +81,7 @@ function AppContent() {
     }
     checkAndNavigate();
   }, [navigate]);
-  
+
   return (
     <main className="app-container !w-full h-full !pt-0">
       <Routes>

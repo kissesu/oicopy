@@ -4,11 +4,15 @@ mod db;
 mod panel_window;
 mod settings;
 mod app_info;
+mod performance_optimization;
+#[cfg(debug_assertions)]
+pub mod test_db;
 
 use crate::clipboard_management::{get_clipboard_history, setup_clipboard_monitor};
 use crate::panel_window::{setup_panel_window, open_panel_window, hide_panel_window, toggle_panel_window};
 use crate::settings::{get_app_settings, save_app_settings, cleanup_old_history_command, clear_all_history_command, get_data_count, emit_data_cleared_event};
 use crate::app_info::{get_current_app_info, get_app_icon_by_bundle_id};
+use crate::db::{get_database_stats, perform_maintenance, cleanup_by_limit, cleanup_by_size, perform_smart_cleanup, analyze_database_performance, DatabaseStats, MaintenanceResult, SmartCleanupResult, PerformanceAnalysis};
 use tauri::{Manager, AppHandle, Wry, WindowEvent};
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
 use tauri::menu::{Menu, MenuItem};
@@ -238,7 +242,14 @@ pub fn run() {
             get_data_count,
             emit_data_cleared_event,
             get_current_app_info,
-            get_app_icon_by_bundle_id
+            get_app_icon_by_bundle_id,
+            get_database_statistics,
+            perform_database_maintenance,
+            cleanup_database_by_limit,
+            cleanup_database_by_size,
+            perform_smart_cleanup_command,
+            analyze_database_performance_command,
+            test_database_optimization_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -274,4 +285,68 @@ async fn perform_auto_cleanup(app_handle: &AppHandle<Wry>) -> Result<usize, Stri
     let conn = init_database(app_handle)?;
     let settings = get_settings(&conn)?;
     cleanup_old_history(&conn, settings.retention_days)
+}
+
+// Tauri命令：获取数据库统计信息
+#[tauri::command]
+async fn get_database_statistics(app: AppHandle) -> Result<DatabaseStats, String> {
+    use crate::db::init_database;
+    
+    let conn = init_database(&app)?;
+    get_database_stats(&conn)
+}
+
+// Tauri命令：执行数据库维护
+#[tauri::command]
+async fn perform_database_maintenance(app: AppHandle) -> Result<MaintenanceResult, String> {
+    use crate::db::init_database;
+    
+    let conn = init_database(&app)?;
+    perform_maintenance(&conn)
+}
+
+// Tauri命令：按数量限制清理数据库
+#[tauri::command]
+async fn cleanup_database_by_limit(app: AppHandle, max_records: i64) -> Result<usize, String> {
+    use crate::db::init_database;
+    
+    let conn = init_database(&app)?;
+    cleanup_by_limit(&conn, max_records)
+}
+
+// Tauri命令：按大小限制清理数据库
+#[tauri::command]
+async fn cleanup_database_by_size(app: AppHandle, max_size_mb: f64) -> Result<usize, String> {
+    use crate::db::init_database;
+    
+    let conn = init_database(&app)?;
+    cleanup_by_size(&conn, max_size_mb)
+}
+
+// Tauri命令：执行智能清理
+#[tauri::command]
+async fn perform_smart_cleanup_command(app: AppHandle) -> Result<SmartCleanupResult, String> {
+    use crate::db::init_database;
+    
+    let conn = init_database(&app)?;
+    perform_smart_cleanup(&conn)
+}
+
+// Tauri命令：分析数据库性能
+#[tauri::command]
+async fn analyze_database_performance_command(app: AppHandle) -> Result<PerformanceAnalysis, String> {
+    use crate::db::init_database;
+    
+    let conn = init_database(&app)?;
+    analyze_database_performance(&conn)
+}
+
+// Tauri命令：测试数据库优化（仅在调试模式下可用）
+#[cfg(debug_assertions)]
+#[tauri::command]
+async fn test_database_optimization_command() -> Result<String, String> {
+    use crate::test_db::test_database_optimization;
+    
+    test_database_optimization()?;
+    Ok("数据库优化测试完成".to_string())
 }

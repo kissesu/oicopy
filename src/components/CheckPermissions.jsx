@@ -125,21 +125,13 @@ function HomePage() {
         <p className="text-xs ml-1">
           {isSettingPanel ? '请授权下面的权限以使用剪贴板功能' : '允许下面的权限, 然后重启 App'}
         </p>
-        {isSettingPanel && (
-          <button
-            onClick={checkCurrentPermissions}
-            className="ml-auto text-xs px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded transition-colors duration-200"
-            title="刷新权限状态"
-          >
-            刷新
-          </button>
-        )}
+        
       </div>
 
       {!isSettingPanel && <hr className="border-gray-300" />}
 
       {/* 权限状态提示 */}
-      {isSettingPanel && (!isAccessible || !isFullDiskAccessible) && (
+      {/* {isSettingPanel && (!isAccessible || !isFullDiskAccessible) && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
           <div className="flex items-start gap-2">
             <span className="material-icons text-yellow-600 !text-[16px] mt-0.5">warning</span>
@@ -151,7 +143,7 @@ function HomePage() {
             </div>
           </div>
         </div>
-      )}
+      )} */}
 
       <div className={`flex flex-col gap-3 ${isSettingPanel ? 'bg-white rounded-lg p-4 shadow-sm border border-gray-200' : 'my-3'}`}>
         <div className="flex justify-between items-center gap-2">
